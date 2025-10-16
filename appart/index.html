@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Température & Humidité - Appartement</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f4f6f8;
+      color: #333;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 {
+      color: #0078ff;
+    }
+    .cards {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+      width: 220px;
+      padding: 20px;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+    .card:hover {
+      transform: scale(1.05);
+    }
+    .emoji {
+      font-size: 2.2em;
+    }
+    .value {
+      font-size: 2em;
+      color: #0078ff;
+    }
+    .label {
+      font-size: 1em;
+      color: #777;
+    }
+    canvas {
+      margin-top: 40px;
+      max-width: 800px;
+      background: white;
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+
+  <h1>📊 Suivi Température & Humidité - Appartement</h1>
+
+  <div class="cards">
+    <div class="card">
+      <div class="emoji">🌡️</div>
+      <div class="value" id="tempValue">-- °C</div>
+      <div class="label">Température actuelle</div>
+    </div>
+    <div class="card">
+      <div class="emoji">💧</div>
+      <div class="value" id="humValue">-- %</div>
+      <div class="label">Humidité actuelle</div>
+    </div>
+  </div>
+
+  <canvas id="chart"></canvas>
+
+  <script>
+    const sheetURL = "https://script.google.com/macros/s/AKfycbyQB4i0slXugniXzjm4xj_qbl3LHpWVBa4CmlL12i8qCYA7KtIfSXmZlYQS1j06Vg5H/exec";
+
+    let chart;
+    let allData = [];
+
+    async function fetchData() {
+      const res = await fetch(sheetURL);
+      allData = await res.json();
+
+      // 🕒 On garde uniquement les 7 derniers jours
+      const now = new Date();
+      const last7Days = allData.filter(row => {
+        const date = new Date(row.timestamp);
+        return (now - date) / (1000 * 60 * 60 * 24) <= 7;
+      });
+
+      // 📉 On met à jour les valeurs affichées
+      const latest = last7Days[last7Days.length - 1];
+      document.getElementById('tempValue').textContent = latest.temperature + " °C";
+      document.getElementById('humValue').textContent = latest.humidity + " %";
+
+      // 🧭 On trace le graphique combiné
+      drawChart(last7Days);
+    }
+
+    function drawChart(data) {
+      const labels = data.map(r => {
+        const d = new Date(r.timestamp);
+        return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) + " " +
+               d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      });
+      const temp = data.map(r => r.temperature);
+      const hum = data.map(r => r.humidity);
+
+      if (chart) chart.destroy();
+
+      chart = new Chart(document.getElementById('chart'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Température (°C)',
+              data: temp,
+              borderColor: 'red',
+              backgroundColor: 'rgba(255, 99, 132, 0.2)',
+              yAxisID: 'y',
+              tension: 0.3
+            },
+            {
+              label: 'Humidité (%)',
+              data: hum,
+              borderColor: 'blue',
+              backgroundColor: 'rgba(54, 162, 235, 0.2)',
+              yAxisID: 'y1',
+              tension: 0.3
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          interaction: {
+            mode: 'index',
+            intersect: false,
+          },
+          stacked: false,
+          plugins: {
+            title: {
+              display: true,
+              text: 'Évolution Température & Humidité sur 7 jours'
+            }
+          },
+          scales: {
+            y: {
+              type: 'linear',
+              display: true,
+              position: 'left',
+              title: {
+                display: true,
+                text: 'Température (°C)'
+              }
+            },
+            y1: {
+              type: 'linear',
+              display: true,
+              position: 'right',
+              grid: {
+                drawOnChartArea: false,
+              },
+              title: {
+                display: true,
+                text: 'Humidité (%)'
+              }
+            }
+          }
+        }
+      });
+    }
+
+    fetchData();
+    setInterval(fetchData, 60000);
+  </script>
+
+</body>
+</html>
